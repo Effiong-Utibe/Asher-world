@@ -1,73 +1,120 @@
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import { ArrowLeft, Save, UploadCloud, Plus } from 'lucide-react';
-import type { ChangeEvent, FormEvent } from 'react';
-import { useMemo, useState } from 'react';
+import {
+    ArrowLeft,
+    Save,
+    UploadCloud,
+    Plus,
+    Trash2,
+    X,
+    AlertCircle,
+} from 'lucide-react';
+import type { ChangeEvent, ReactNode, SubmitEvent } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { store } from '@/routes/admin/products';
+import { store } from '@/routes/products';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { PageProps } from '@inertiajs/core';
 
 interface Variant {
     size: string;
     color: string;
-    sku: string;
     stock_quantity: number;
     price_adjustment: number;
 }
+interface Department {
+    id: number;
+    name: string;
+    categories: Category[];
+}
+
+interface Category {
+    id: number;
+    name: string;
+}
+interface Status {
+    value: string;
+    label: string;
+    color: string;
+}
+
+interface Props extends PageProps{
+    departments: Department[];
+    statuses: Status[];
+    flash: {
+        success?: string;
+        error?: string;
+        message?: string;
+    };
+}
 
 export default function Create() {
-    const { departments } = usePage().props as any;
+    const { departments, statuses, flash } = usePage<Props>().props;
     const [departmentId, setDepartmentId] = useState('');
-
-    const selectedDepartment = departments.find(
-        (department: any) => department.id.toString() === departmentId,
-    );
-
     const [images, setImages] = useState<File[]>([]);
     const [progress, setProgress] = useState<{ percentage: number } | null>(
         null,
     );
 
+    // Filter categories from the selected department
+    const filteredCategories = useMemo(() => {
+        if (!departments || !departmentId) return [];
+
+        const selectedDepartment = departments.find(
+            (dept: any) => dept.id?.toString() === departmentId,
+        );
+
+        return selectedDepartment?.categories ?? [];
+    }, [departments, departmentId]);
+
     const { data, setData, post, processing, errors } = useForm({
-        category_id: '',
         name: '',
         slug: '',
-        sku: '',
-        department_id: '',
-        size: '',
-        price_adjustment: '',
         short_description: '',
         description: '',
         material: '',
-        color: '',
         price: '',
         stock_quantity: '',
         discount_percent: '',
-        is_featured: false,
-        is_new_arrival: false,
-        is_best_seller: false,
-        is_limited_edition: false,
-        is_trending: false,
-        is_active: true,
+        status: 'draft',
+        final_price: '',
+
+        // Organization
+        department_id: '',
+        category_id: '',
 
         variants: [
             {
                 size: '',
                 color: '',
-                sku: '',
                 stock_quantity: 0,
                 price_adjustment: 0,
             },
         ] as Variant[],
+
+        // Product Flags
+        flag_is_active: false,
+        flag_is_featured: false,
+        flag_is_trending: false,
+        flag_is_new_arrival: false,
+        flag_is_best_seller: false,
+        flag_is_limited_edition: false,
 
         images: [] as File[],
     });
 
     const handleNameChange = (value: string) => {
         setData('name', value);
-
         setData(
             'slug',
             value
@@ -78,14 +125,43 @@ export default function Create() {
         );
     };
 
+    // useEffect(() => {
+    //     return () => {
+    //         images.forEach((image) =>
+    //             URL.revokeObjectURL(URL.createObjectURL(image)),
+    //         );
+    //     };
+    // }, [images]);
+    const previews = useMemo(() => {
+        return images.map((file) => ({
+            file,
+            url: URL.createObjectURL(file),
+        }));
+    }, [images]);
+
+    useEffect(() => {
+        return () => {
+            previews.forEach((preview) => URL.revokeObjectURL(preview.url));
+        };
+    }, [previews]);
+
     const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files) return;
-
         const files = Array.from(e.target.files);
-        const newImages = [...images, ...files];
+        const merged = [...images];
 
-        setImages(newImages);
-        setData('images', newImages);
+        files.forEach((file) => {
+            const exists = merged.some(
+                (img) => img.name === file.name && img.size === file.size,
+            );
+
+            if (!exists) {
+                merged.push(file);
+            }
+        });
+
+        setImages(merged);
+        setData('images', merged);
     };
 
     const removeImage = (index: number) => {
@@ -93,14 +169,13 @@ export default function Create() {
         setImages(updatedImages);
         setData('images', updatedImages);
     };
-    //variant handlers
+
     const addVariant = () => {
         setData('variants', [
             ...data.variants,
             {
                 size: '',
                 color: '',
-                sku: '',
                 stock_quantity: 0,
                 price_adjustment: 0,
             },
@@ -112,21 +187,21 @@ export default function Create() {
         field: keyof Variant,
         value: string | number,
     ) => {
-        const updated = [...data.variants];
-
         const parsedValue: string | number =
-            field === 'stock_quantity'
+            field === 'stock_quantity' || field === 'price_adjustment'
                 ? Number(value) || 0
-                : field === 'price_adjustment'
-                  ? Number(value) || 0
-                  : value;
-
-        updated[index] = {
-            ...updated[index],
-            [field]: parsedValue,
-        };
-
-        setData('variants', updated);
+                : value;
+        setData(
+            'variants',
+            data.variants.map((variant, i) =>
+                i === index
+                    ? {
+                          ...variant,
+                          [field]: parsedValue,
+                      }
+                    : variant,
+            ),
+        );
     };
 
     const removeVariant = (index: number) => {
@@ -136,100 +211,60 @@ export default function Create() {
         );
     };
 
-    function submit(e: React.SubmitEvent<HTMLFormElement>) {
+    function submit(e: SubmitEvent<HTMLFormElement>) {
         e.preventDefault();
 
         post(store.url(), {
             forceFormData: true,
-
             onProgress: (event) => {
-                if (!event) {
-                    setProgress(null);
-                    return;
-                }
-
-                // event may not have precise typing here, so coerce to any
+                if (!event) return setProgress(null);
                 const e: any = event;
-                const loaded = e.loaded ?? 0;
-                const total = e.total ?? 0;
-                const percentage = total
-                    ? Math.round((loaded / total) * 100)
+                const percentage = e.total
+                    ? Math.round((e.loaded / e.total) * 100)
                     : 0;
-
                 setProgress({ percentage });
             },
-
             onSuccess: () => {
                 setImages([]);
                 setProgress(null);
-
-                setData({
-                    category_id: '',
-                    name: '',
-                    slug: '',
-                    sku: '',
-                    short_description: '',
-                    description: '',
-                    material: '',
-                    color: '',
-                    price: '',
-                    stock_quantity: '',
-                    discount_percent: '',
-                    is_featured: false,
-                    is_new_arrival: false,
-                    is_best_seller: false,
-                    is_limited_edition: false,
-                    is_trending: false,
-                    is_active: true,
-
-                    variants: [
-                        {
-                            size: '',
-                            color: '',
-                            sku: '',
-                            stock_quantity: 0,
-                            price_adjustment: 0,
-                        },
-                    ],
-
-                    images: [],
-                });
             },
-
             onError: (errors: any) => {
                 setProgress(null);
                 console.error('Form errors:', errors);
             },
         });
     }
-    // const finalPrice = data.price - (data.price * data.discount_percent) / 100;
+
     const finalPrice = useMemo(() => {
         const price = Number(data.price || 0);
         const discount = Number(data.discount_percent || 0);
-        return price - (price * discount) / 100;
+
+        return Math.max(0, price - (price * discount) / 100);
     }, [data.price, data.discount_percent]);
+
+    useEffect(() => {
+        setData('final_price', finalPrice.toFixed(2));
+    }, [finalPrice]);
 
     return (
         <>
-            <Head title="Products" />
+            <Head title="Create Product" />
 
-            <form onSubmit={submit}>
-                <div className="space-y-8 p-6">
+            <form onSubmit={submit} className="mx-auto max-w-7xl">
+                <div className="space-y-8 p-4 md:p-6 lg:p-8">
                     {/* Header */}
-                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-4">
                             <Link
                                 href="/admin/products"
-                                className="rounded-xl p-2 text-white transition hover:bg-primary"
+                                className="rounded-xl border bg-background p-2 transition hover:bg-muted"
                             >
                                 <ArrowLeft className="h-5 w-5" />
                             </Link>
-
                             <div>
-                                <h1 className="text-2xl font-bold">
+                                <h1 className="text-2xl font-bold tracking-tight">
                                     New Product
                                 </h1>
-
                                 <p className="text-sm text-muted-foreground">
                                     Fill in the details for the new product.
                                 </p>
@@ -237,72 +272,106 @@ export default function Create() {
                         </div>
 
                         <Button
-                            className="gap-2"
+                            className="w-full gap-2 sm:w-auto"
                             type="submit"
                             disabled={processing}
                         >
                             <Save className="h-4 w-4" />
-                            Save Product
+                            {processing ? 'Saving...' : 'Save Product'}
                         </Button>
                     </div>
+                    {/* Validation Errors */}
+                    {flash.error && (
+                        <Alert variant="destructive">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertTitle>Error</AlertTitle>
+                            <AlertDescription>{flash.error}</AlertDescription>
+                        </Alert>
+                    )}
+
+                    {/* Validation Errors */}
+                    {Object.keys(errors).length > 0 && (
+                        <Alert variant="destructive">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertTitle>
+                                Please fix the following errors
+                            </AlertTitle>
+                            <AlertDescription>
+                                <ul className="list-disc space-y-1 pl-5">
+                                    {Object.values(errors).map(
+                                        (error, index) => (
+                                            <li key={index}>{error}</li>
+                                        ),
+                                    )}
+                                </ul>
+                            </AlertDescription>
+                        </Alert>
+                    )}
+                    {progress && (
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
+                            <div
+                                className="h-full bg-primary transition-all duration-300"
+                                style={{ width: `${progress.percentage}%` }}
+                            />
+                        </div>
+                    )}
 
                     <div className="grid gap-6 lg:grid-cols-3">
-                        {/* LEFT SIDE */}
+                        {/* LEFT COLUMN: Main Details */}
                         <div className="space-y-6 lg:col-span-2">
                             {/* Product Information */}
-                            <div className="rounded-2xl border bg-background p-6 shadow-sm">
+                            <div className="rounded-2xl border bg-card p-6 shadow-sm">
                                 <h2 className="mb-6 text-lg font-semibold">
                                     Product Information
                                 </h2>
-
                                 <div className="space-y-5">
-                                    {/* Name */}
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">
-                                            Product Name
-                                        </label>
+                                    <div className="grid gap-5 md:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium">
+                                                Product Name
+                                            </label>
+                                            <Input
+                                                type="text"
+                                                placeholder="Premium Cotton Tee"
+                                                value={data.name}
+                                                onChange={(e) =>
+                                                    handleNameChange(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
 
-                                        <Input
-                                            type="text"
-                                            placeholder="Nike Sneakers"
-                                            value={data.name}
-                                            onChange={(e) =>
-                                                handleNameChange(e.target.value)
-                                            }
-                                        />
-
-                                        {errors.name && (
-                                            <p className="text-sm text-red-500">
-                                                {errors.name}
-                                            </p>
-                                        )}
+                                            {flash.error && (
+                                                <Alert variant="destructive">
+                                                    <AlertTitle>
+                                                        Error
+                                                    </AlertTitle>
+                                                    <AlertDescription>
+                                                        {flash.error}
+                                                    </AlertDescription>
+                                                </Alert>
+                                            )}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium">
+                                                Slug
+                                            </label>
+                                            <Input
+                                                type="text"
+                                                placeholder="premium-cotton-tee"
+                                                value={data.slug}
+                                                readOnly
+                                                className="bg-muted/50"
+                                            />
+                                        </div>
                                     </div>
 
-                                    {/* Slug */}
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">
-                                            Slug
-                                        </label>
-
-                                        <Input
-                                            type="text"
-                                            placeholder="nike-sneakers"
-                                            value={data.slug}
-                                            readOnly
-                                            onChange={(e) =>
-                                                setData('slug', e.target.value)
-                                            }
-                                        />
-                                    </div>
-
-                                    {/* Short Description */}
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium">
                                             Short Description
                                         </label>
-
                                         <Textarea
-                                            placeholder="Short description..."
+                                            placeholder="A brief overview..."
                                             value={data.short_description}
                                             onChange={(e) =>
                                                 setData(
@@ -311,19 +380,12 @@ export default function Create() {
                                                 )
                                             }
                                         />
-                                        {errors.short_description && (
-                                            <p className="text-sm text-red-500">
-                                                {errors.short_description}
-                                            </p>
-                                        )}
                                     </div>
 
-                                    {/* Description */}
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium">
                                             Description
                                         </label>
-
                                         <Textarea
                                             placeholder="Full product description..."
                                             className="min-h-[120px]"
@@ -335,154 +397,136 @@ export default function Create() {
                                                 )
                                             }
                                         />
-                                        {errors.description && (
-                                            <p className="text-sm text-red-500">
-                                                {errors.description}
-                                            </p>
-                                        )}
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Pricing */}
-                            <div className="rounded-2xl border bg-background p-6 shadow-sm">
-                                <h2 className="mb-6 text-lg font-semibold">
-                                    Pricing
-                                </h2>
-
-                                <div className="grid gap-5 md:grid-cols-2">
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">
-                                            Price
-                                        </label>
-                                        <Input
-                                            type="number"
-                                            placeholder="5000"
-                                            value={data.price}
-                                            onChange={(e) =>
-                                                setData('price', e.target.value)
-                                            }
-                                        />
-                                        {errors.price && (
-                                            <p className="text-danger text-red-500">
-                                                {errors.price}
-                                            </p>
-                                        )}
+                            {/* Pricing & Inventory */}
+                            <div className="grid gap-6 md:grid-cols-1">
+                                <div className="space-y-5 rounded-2xl border bg-card p-6 shadow-sm">
+                                    <div className="space-y-5 rounded-2xl border bg-card p-6 shadow-sm">
+                                        <h2 className="text-lg font-semibold">
+                                            Inventory
+                                        </h2>
+                                        <div className="space-y-4">
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-medium">
+                                                    Global Stock
+                                                </label>
+                                                <Input
+                                                    type="number"
+                                                    placeholder="100"
+                                                    value={data.stock_quantity}
+                                                    onChange={(e) =>
+                                                        setData(
+                                                            'stock_quantity',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
-
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">
-                                            Discount Price
-                                        </label>
-
-                                        <Input
-                                            type="number"
-                                            placeholder="Discount %"
-                                            value={data.discount_percent}
-                                            onChange={(e) =>
-                                                setData(
-                                                    'discount_percent',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                        {errors.discount_percent && (
-                                            <p className="text-sm text-red-500">
-                                                {errors.discount_percent}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <p className="text-sm text-green-600">
-                                        Final Price: ₦
-                                        {finalPrice.toLocaleString()}
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* Inventory */}
-                            <div className="rounded-2xl border bg-background p-6 shadow-sm">
-                                <h2 className="mb-6 text-lg font-semibold">
-                                    Inventory
-                                </h2>
-
-                                <div className="grid gap-5 md:grid-cols-2">
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">
-                                            Stock Quantity
-                                        </label>
-
-                                        <Input
-                                            type="number"
-                                            placeholder="10"
-                                            value={data.stock_quantity}
-                                            onChange={(e) =>
-                                                setData(
-                                                    'stock_quantity',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                        {errors.stock_quantity && (
-                                            <p className="text-sm text-red-500">
-                                                {errors.stock_quantity}
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">
-                                            SKU
-                                        </label>
-
-                                        <Input
-                                            type="text"
-                                            placeholder="SKU-001"
-                                            value={data.sku}
-                                            onChange={(e) =>
-                                                setData('sku', e.target.value)
-                                            }
-                                        />
-                                        {errors.sku && (
-                                            <p className="text-sm text-red-500">
-                                                {errors.sku}
-                                            </p>
-                                        )}
+                                    <h2 className="text-lg font-semibold">
+                                        Pricing
+                                    </h2>
+                                    <div className="space-y-4">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium">
+                                                Base Price (₦)
+                                            </label>
+                                            <Input
+                                                type="number"
+                                                placeholder="5000"
+                                                value={data.price}
+                                                onChange={(e) =>
+                                                    setData(
+                                                        'price',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium">
+                                                Discount (%)
+                                            </label>
+                                            <Input
+                                                type="number"
+                                                placeholder="0"
+                                                value={data.discount_percent}
+                                                onChange={(e) =>
+                                                    setData(
+                                                        'discount_percent',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        <div className="rounded-lg bg-muted p-3">
+                                            <div className="rounded-lg bg-muted p-3">
+                                                <p className="text-sm font-medium">
+                                                    Final Price:
+                                                    <span className="text-green-600">
+                                                        ₦
+                                                        {Number(
+                                                            data.final_price,
+                                                        ).toLocaleString()}
+                                                    </span>
+                                                </p>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Product Variants */}
-                            <div className="rounded-2xl border bg-background p-6 shadow-sm">
-                                <div className="mb-6 flex items-center justify-between">
-                                    <h2 className="text-lg font-semibold">
-                                        Product Variants
-                                    </h2>
-
+                            <div className="rounded-2xl border bg-card p-6 shadow-sm">
+                                <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                                    <div>
+                                        <h2 className="text-lg font-semibold">
+                                            Product Variants
+                                        </h2>
+                                        <p className="text-sm text-muted-foreground">
+                                            Add sizes, colors, or specific
+                                            pricing.
+                                        </p>
+                                    </div>
                                     <Button
                                         type="button"
                                         variant="outline"
                                         onClick={addVariant}
-                                        className="gap-2"
+                                        className="shrink-0 gap-2"
                                     >
-                                        <Plus className="h-4 w-4" />
-                                        Add Variant
+                                        <Plus className="h-4 w-4" /> Add Variant
                                     </Button>
                                 </div>
 
-                                <div className="space-y-5">
+                                <div className="space-y-4">
                                     {data.variants.map((variant, index) => (
                                         <div
                                             key={index}
-                                            className="grid gap-4 rounded-xl border p-4 md:grid-cols-2"
+                                            className="relative grid gap-4 rounded-xl border bg-muted/20 p-5 pt-8 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5"
                                         >
-                                            {/* SIZE */}
-                                            <div>
-                                                <label htmlFor="Size">
+                                            {data.variants.length > 1 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        removeVariant(index)
+                                                    }
+                                                    className="absolute top-3 right-3 text-muted-foreground transition hover:text-destructive"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                            )}
+
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-medium">
                                                     Size
                                                 </label>
                                                 <Input
-                                                    placeholder="Size (S, M, L, XL)"
                                                     value={variant.size}
+                                                    placeholder="S,M,L,XL"
                                                     onChange={(e) =>
                                                         handleVariantChange(
                                                             index,
@@ -491,21 +535,14 @@ export default function Create() {
                                                         )
                                                     }
                                                 />
-                                                {errors.size && (
-                                                    <p className="text-sm text-red-500">
-                                                        {errors.size}
-                                                    </p>
-                                                )}
                                             </div>
-
-                                            {/* COLOR */}
-                                            <div>
-                                                <label htmlFor="color">
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-medium">
                                                     Color
                                                 </label>
                                                 <Input
-                                                    placeholder="Color (Black, Red)"
                                                     value={variant.color}
+                                                    placeholder="blue,red"
                                                     onChange={(e) =>
                                                         handleVariantChange(
                                                             index,
@@ -514,21 +551,13 @@ export default function Create() {
                                                         )
                                                     }
                                                 />
-                                                {errors.color && (
-                                                    <p className="text-sm text-red-500">
-                                                        {errors.color}
-                                                    </p>
-                                                )}
                                             </div>
-
-                                            {/* STOCK */}
-                                            <div>
-                                                <label htmlFor="stock">
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-medium">
                                                     Stock
                                                 </label>
                                                 <Input
                                                     type="number"
-                                                    placeholder="Stock Quantity"
                                                     value={
                                                         variant.stock_quantity
                                                     }
@@ -540,22 +569,13 @@ export default function Create() {
                                                         )
                                                     }
                                                 />
-                                                {errors.stock_quantity && (
-                                                    <p className="text-sm text-red-500">
-                                                        {errors.stock_quantity}
-                                                    </p>
-                                                )}
                                             </div>
-
-                                            {/* PRICE ADJUSTMENT */}
-                                            <div>
-                                                <label htmlFor="price_add">
-                                                    Price Adjustment
+                                            <div className="space-y-2 sm:col-span-2 md:col-span-4 lg:col-span-1">
+                                                <label className="text-xs font-medium">
+                                                    Price (+/-)
                                                 </label>
                                                 <Input
                                                     type="number"
-                                                    step="0.01"
-                                                    placeholder="Price Adjustment (+/-)"
                                                     value={
                                                         variant.price_adjustment
                                                     }
@@ -567,69 +587,6 @@ export default function Create() {
                                                         )
                                                     }
                                                 />
-                                                {errors.price_adjustment && (
-                                                    <p className="text-sm text-red-500">
-                                                        {
-                                                            errors.price_adjustment
-                                                        }
-                                                    </p>
-                                                )}
-                                            </div>
-                                            {/* SKU */}
-                                            <div>
-                                                <label htmlFor="sku">Sku</label>
-                                                <Input
-                                                    placeholder="SKU"
-                                                    value={variant.sku}
-                                                    onChange={(e) =>
-                                                        handleVariantChange(
-                                                            index,
-                                                            'sku',
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                />
-                                                {errors.sku && (
-                                                    <p className="text-sm text-red-500">
-                                                        {errors.sku}
-                                                    </p>
-                                                )}
-                                            </div>
-
-                                            {/* REMOVE BUTTON */}
-                                            <div className="flex items-center justify-end md:col-span-2">
-                                                <Button
-                                                    type="button"
-                                                    variant="destructive"
-                                                    onClick={() =>
-                                                        removeVariant(index)
-                                                    }
-                                                >
-                                                    Remove Variant
-                                                </Button>
-                                            </div>
-
-                                            {/* SKU SUGGESTION */}
-                                            <div className="text-xs text-muted-foreground md:col-span-2">
-                                                Suggested SKU:{' '}
-                                                <span className="font-mono">
-                                                    {(
-                                                        variant.color?.slice(
-                                                            0,
-                                                            3,
-                                                        ) +
-                                                        '-' +
-                                                        variant.size?.slice(
-                                                            0,
-                                                            2,
-                                                        )
-                                                    )
-                                                        .toUpperCase()
-                                                        .replace(
-                                                            'UNDEFINED',
-                                                            '',
-                                                        )}
-                                                </span>
                                             </div>
                                         </div>
                                     ))}
@@ -637,185 +594,270 @@ export default function Create() {
                             </div>
                         </div>
 
-                        {/* RIGHT SIDE */}
-                        <div className="space-y-6">
-                            {/* Images upload*/}
-                            <div className="rounded-2xl border bg-background p-6 shadow-sm">
-                                <h2 className="mb-6 text-lg font-semibold">
-                                    Product Images
+                        {/* RIGHT COLUMN: Sidebar */}
+                        <div className="space-y-6 lg:col-span-1">
+                            {/* Product Status & Flag */}
+                            <div className="rounded-2xl border bg-card p-6 shadow-sm">
+                                <h2 className="mb-4 text-lg font-semibold">
+                                    Status & Visibility
                                 </h2>
-
-                                <label className="flex min-h-[220px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-muted-foreground/25 bg-muted/20 p-6 transition hover:bg-muted/40">
-                                    <UploadCloud className="mb-4 h-10 w-10 text-muted-foreground" />
-
-                                    <p className="text-sm font-medium">
-                                        Click to upload images
-                                    </p>
-
-                                    <Input
-                                        type="file"
-                                        multiple
-                                        accept="image/*"
-                                        className="hidden"
-                                        onChange={handleImageUpload}
-                                    />
-                                </label>
-
-                                {progress && (
-                                    <div className="mt-4">
-                                        <progress
-                                            value={progress.percentage}
-                                            max="100"
-                                            className="w-full"
+                                <div className="space-y-5">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">
+                                            Product Status
+                                        </label>
+                                        <Select
+                                            value={data.status}
+                                            onValueChange={(value) =>
+                                                setData('status', value)
+                                            }
                                         >
-                                            {progress.percentage}%
-                                        </progress>
-                                    </div>
-                                )}
-                                {errors.images && (
-                                    <p className="text-sm text-red-500">
-                                        {errors.images}
-                                    </p>
-                                )}
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select Status" />
+                                            </SelectTrigger>
 
-                                {images.length > 0 && (
-                                    <div className="mt-5">
-                                        <p className="mb-3 text-sm font-medium">
-                                            {images.length} image
-                                            {images.length !== 1
-                                                ? 's'
-                                                : ''}{' '}
-                                            selected
+                                            <SelectContent>
+                                                {statuses.map((status) => (
+                                                    <SelectItem
+                                                        key={status.value}
+                                                        value={status.value}
+                                                    >
+                                                        {status.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <p className="text-xs text-muted-foreground">
+                                            Draft products are hidden from the
+                                            store.
                                         </p>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            {images.map((image, index) => (
-                                                <div
-                                                    key={index}
-                                                    className="group relative overflow-hidden rounded-xl border"
-                                                >
-                                                    <img
-                                                        src={URL.createObjectURL(
-                                                            image,
-                                                        )}
-                                                        alt={`Preview ${index}`}
-                                                        className="h-15 w-full object-cover"
-                                                    />
-                                                    <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
-                                                        <Button
-                                                            type="button"
-                                                            variant="destructive"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                removeImage(
-                                                                    index,
-                                                                )
-                                                            }
-                                                        >
-                                                            Remove
-                                                        </Button>
-                                                    </div>
-                                                    <p className="truncate bg-muted px-2 py-1 text-xs">
-                                                        {image.name}
-                                                    </p>
-                                                </div>
-                                            ))}
-                                        </div>
                                     </div>
-                                )}
+
+                                    <div className="space-y-3 border-b pb-4">
+                                        <label className="text-sm font-medium">
+                                            Product Flags
+                                        </label>
+                                        <div className="space-y-2">
+                                            <div className="flex items-center space-x-3">
+                                                <Checkbox
+                                                    id="flag_is_active"
+                                                    checked={
+                                                        data.flag_is_active
+                                                    }
+                                                    onCheckedChange={(
+                                                        checked,
+                                                    ) =>
+                                                        setData(
+                                                            'flag_is_active',
+                                                            !!checked,
+                                                        )
+                                                    }
+                                                />
+                                                <label
+                                                    htmlFor="flag_is_active"
+                                                    className="text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                                >
+                                                    Active
+                                                </label>
+                                            </div>
+                                            <div className="flex items-center space-x-3">
+                                                <Checkbox
+                                                    id="flag_is_featured"
+                                                    checked={
+                                                        data.flag_is_featured
+                                                    }
+                                                    onCheckedChange={(
+                                                        checked,
+                                                    ) =>
+                                                        setData(
+                                                            'flag_is_featured',
+                                                            !!checked,
+                                                        )
+                                                    }
+                                                />
+                                                <label
+                                                    htmlFor="flag_is_featured"
+                                                    className="text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                                >
+                                                    Featured
+                                                </label>
+                                            </div>
+                                            <div className="flex items-center space-x-3">
+                                                <Checkbox
+                                                    id="flag_is_trending"
+                                                    checked={
+                                                        data.flag_is_trending
+                                                    }
+                                                    onCheckedChange={(
+                                                        checked,
+                                                    ) =>
+                                                        setData(
+                                                            'flag_is_trending',
+                                                            !!checked,
+                                                        )
+                                                    }
+                                                />
+                                                <label
+                                                    htmlFor="flag_is_trending"
+                                                    className="text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                                >
+                                                    Trending
+                                                </label>
+                                            </div>
+                                            <div className="flex items-center space-x-3">
+                                                <Checkbox
+                                                    id="flag_is_new_arrival"
+                                                    checked={
+                                                        data.flag_is_new_arrival
+                                                    }
+                                                    onCheckedChange={(
+                                                        checked,
+                                                    ) =>
+                                                        setData(
+                                                            'flag_is_new_arrival',
+                                                            !!checked,
+                                                        )
+                                                    }
+                                                />
+                                                <label
+                                                    htmlFor="flag_is_new_arrival"
+                                                    className="text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                                >
+                                                    New Arrival
+                                                </label>
+                                            </div>
+                                            <div className="flex items-center space-x-3">
+                                                <Checkbox
+                                                    id="flag_is_best_seller"
+                                                    checked={
+                                                        data.flag_is_best_seller
+                                                    }
+                                                    onCheckedChange={(
+                                                        checked,
+                                                    ) =>
+                                                        setData(
+                                                            'flag_is_best_seller',
+                                                            !!checked,
+                                                        )
+                                                    }
+                                                />
+                                                <label
+                                                    htmlFor="flag_is_best_seller"
+                                                    className="text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                                >
+                                                    Best Seller
+                                                </label>
+                                            </div>
+                                            <div className="flex items-center space-x-3">
+                                                <Checkbox
+                                                    id="flag_is_limited_edition"
+                                                    checked={
+                                                        data.flag_is_limited_edition
+                                                    }
+                                                    onCheckedChange={(
+                                                        checked,
+                                                    ) =>
+                                                        setData(
+                                                            'flag_is_limited_edition',
+                                                            !!checked,
+                                                        )
+                                                    }
+                                                />
+                                                <label
+                                                    htmlFor="flag_is_limited_edition"
+                                                    className="text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                                >
+                                                    Limited Edition
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            Select flags to highlight this
+                                            product.
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
 
-                            {/* Organization */}
-                            <div className="rounded-2xl border bg-background p-6 shadow-sm">
-                                <h2 className="mb-6 text-lg font-semibold">
-                                    Product Organization
+                            {/* Organization (Department & Category) */}
+                            <div className="rounded-2xl border bg-card p-6 shadow-sm">
+                                <h2 className="mb-4 text-lg font-semibold">
+                                    Organization
                                 </h2>
-
-                                <div className="space-y-5">
-                                    {/* department */}
+                                <div className="space-y-4">
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium">
                                             Department
                                         </label>
-
-                                        <select
-                                            className="h-11 w-full rounded-lg border bg-background px-3 text-sm"
+                                        <Select
                                             value={departmentId}
-                                            onChange={(e) => {
-                                                setDepartmentId(e.target.value);
-                                                setData(
-                                                    'department_id',
-                                                    e.target.value,
-                                                );
+                                            onValueChange={(val) => {
+                                                setData('department_id', val);
+                                                setDepartmentId(val);
+                                                // Reset category when department changes
+                                                setData('category_id', '');
                                             }}
                                         >
-                                            <option value="">
-                                                Select Department
-                                            </option>
-
-                                            {departments?.map(
-                                                (department: any) => (
-                                                    <option
-                                                        key={department.id}
-                                                        value={department.id}
-                                                    >
-                                                        {department.name}
-                                                    </option>
-                                                ),
-                                            )}
-                                        </select>
-                                        {errors.department_id && (
-                                            <p className="text-sm text-red-500">
-                                                {errors.department_id}
-                                            </p>
-                                        )}
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select a department" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {departments?.map(
+                                                    (dept: any) => (
+                                                        <SelectItem
+                                                            key={dept.id}
+                                                            value={dept.id.toString()}
+                                                        >
+                                                            {dept.name}
+                                                        </SelectItem>
+                                                    ),
+                                                )}
+                                            </SelectContent>
+                                        </Select>
                                     </div>
-                                    {/* Category */}
+
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium">
                                             Category
                                         </label>
-                                        <select
-                                            className="h-11 w-full rounded-lg border bg-background px-3 text-sm"
+                                        <Select
                                             value={data.category_id}
-                                            onChange={(e) =>
-                                                setData(
-                                                    'category_id',
-                                                    e.target.value,
-                                                )
+                                            onValueChange={(val) =>
+                                                setData('category_id', val)
                                             }
+                                            disabled={!departmentId}
                                         >
-                                            <option value="">
-                                                Select Category
-                                            </option>
-                                            {selectedDepartment?.categories.map(
-                                                (category: any) => (
-                                                    <option
-                                                        key={category.id}
-                                                        value={category.id}
-                                                    >
-                                                        {category.name}
-                                                    </option>
-                                                ),
-                                            )}
-                                        </select>
-                                        {errors.category_id && (
-                                            <p className="text-sm text-red-500">
-                                                {errors.category_id}
-                                            </p>
-                                        )}
+                                            <SelectTrigger>
+                                                <SelectValue
+                                                    placeholder={
+                                                        departmentId
+                                                            ? 'Select a category'
+                                                            : 'Select a department first'
+                                                    }
+                                                />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {filteredCategories?.map(
+                                                    (cat: any) => (
+                                                        <SelectItem
+                                                            key={cat.id}
+                                                            value={cat.id.toString()}
+                                                        >
+                                                            {cat.name}
+                                                        </SelectItem>
+                                                    ),
+                                                )}
+                                            </SelectContent>
+                                        </Select>
                                     </div>
 
-                                    {/* Gender */}
-
-                                    {/* Material */}
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium">
                                             Material
                                         </label>
-
                                         <Input
                                             type="text"
-                                            placeholder="Leather"
+                                            placeholder="e.g. Cotton, Leather"
                                             value={data.material}
                                             onChange={(e) =>
                                                 setData(
@@ -824,136 +866,53 @@ export default function Create() {
                                                 )
                                             }
                                         />
-                                        {errors.material && (
-                                            <p className="text-sm text-red-500">
-                                                {errors.material}
-                                            </p>
-                                        )}
                                     </div>
+                                </div>
+                            </div>
 
-                                    {/* Color */}
-                                    {/* <div className="space-y-2">
-                                        <label className="text-sm font-medium">
-                                            Color
-                                        </label>
-
+                            {/* Media / Images */}
+                            <div className="rounded-2xl border bg-card p-6 shadow-sm">
+                                <h2 className="mb-4 text-lg font-semibold">
+                                    Product Images
+                                </h2>
+                                <div className="space-y-4">
+                                    <div className="relative flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 transition hover:bg-muted/50">
+                                        <UploadCloud className="mb-3 h-8 w-8 text-muted-foreground" />
+                                        <p className="text-sm font-medium text-muted-foreground">
+                                            Click or drag images to upload
+                                        </p>
                                         <Input
-                                            type="text"
-                                            placeholder="Black"
-                                            value={data.color}
-                                            onChange={(e) =>
-                                                setData('color', e.target.value)
-                                            }
+                                            type="file"
+                                            multiple
+                                            accept="image/*"
+                                            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                                            onChange={handleImageUpload}
                                         />
-                                        {errors.color && (
-                                            <p className="text-sm text-red-500">
-                                                {errors.color}
-                                            </p>
-                                        )}
-                                    </div> */}
-
-                                    {/* Status */}
-                                    <div className="space-y-4">
-                                        <label className="text-sm font-medium">
-                                            Product Flags
-                                        </label>
-
-                                        <div className="flex flex-col gap-3">
-                                            <label className="flex items-center gap-2 text-sm">
-                                                <Checkbox
-                                                    checked={data.is_active}
-                                                    onCheckedChange={(
-                                                        checked,
-                                                    ) =>
-                                                        setData(
-                                                            'is_active',
-                                                            checked as boolean,
-                                                        )
-                                                    }
-                                                />
-                                                Active Product
-                                            </label>
-                                            <label className="flex items-center gap-2 text-sm">
-                                                <Checkbox
-                                                    checked={data.is_featured}
-                                                    onCheckedChange={(
-                                                        checked,
-                                                    ) =>
-                                                        setData(
-                                                            'is_featured',
-                                                            checked as boolean,
-                                                        )
-                                                    }
-                                                />
-                                                Featured Product
-                                            </label>
-                                            <label className="flex items-center gap-2 text-sm">
-                                                <Checkbox
-                                                    checked={data.is_trending}
-                                                    onCheckedChange={(
-                                                        checked,
-                                                    ) =>
-                                                        setData(
-                                                            'is_trending',
-                                                            checked as boolean,
-                                                        )
-                                                    }
-                                                />
-                                                Trending product
-                                            </label>
-
-                                            <label className="flex items-center gap-2 text-sm">
-                                                <Checkbox
-                                                    checked={
-                                                        data.is_new_arrival
-                                                    }
-                                                    onCheckedChange={(
-                                                        checked,
-                                                    ) =>
-                                                        setData(
-                                                            'is_new_arrival',
-                                                            checked as boolean,
-                                                        )
-                                                    }
-                                                />
-                                                New Arrival
-                                            </label>
-
-                                            <label className="flex items-center gap-2 text-sm">
-                                                <Checkbox
-                                                    checked={
-                                                        data.is_best_seller
-                                                    }
-                                                    onCheckedChange={(
-                                                        checked,
-                                                    ) =>
-                                                        setData(
-                                                            'is_best_seller',
-                                                            checked as boolean,
-                                                        )
-                                                    }
-                                                />
-                                                Best Seller
-                                            </label>
-
-                                            <label className="flex items-center gap-2 text-sm">
-                                                <Checkbox
-                                                    checked={
-                                                        data.is_limited_edition
-                                                    }
-                                                    onCheckedChange={(
-                                                        checked,
-                                                    ) =>
-                                                        setData(
-                                                            'is_limited_edition',
-                                                            checked as boolean,
-                                                        )
-                                                    }
-                                                />
-                                                Limited Edition
-                                            </label>
-                                        </div>
                                     </div>
+                                    {images.length > 0 && (
+                                        <div className="grid grid-cols-3 gap-3">
+                                            {images.map((img, idx) => (
+                                                <div
+                                                    key={idx}
+                                                    className="group relative aspect-square overflow-hidden rounded-lg border bg-muted"
+                                                >
+                                                    <img
+                                                        src={previews[idx].url}
+                                                        alt="Preview"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            removeImage(idx)
+                                                        }
+                                                        className="absolute top-1 right-1 rounded-full bg-background/80 p-1 text-destructive opacity-0 backdrop-blur transition group-hover:opacity-100"
+                                                    >
+                                                        <X className="h-3 w-3" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>

@@ -1,10 +1,11 @@
 import { Check } from "lucide-react"
 import {
   STATUS_FLOW,
-  formatDate,
-  type Order,
-  type OrderStatus,
+  formatDate
+  
+  
 } from "@/lib/orders"
+import type {Order, OrderStatus} from "@/lib/orders";
 import { cn } from "@/lib/utils"
 
 export function TrackingProgress({ order }: { order: Order }) {
@@ -24,6 +25,7 @@ export function TrackingProgress({ order }: { order: Order }) {
         const reached = index <= currentIndex
         const completed = index < currentIndex
         const isLast = index === STATUS_FLOW.length - 1
+
         return (
           <li
             key={step}
@@ -74,6 +76,7 @@ export function TrackingHistory({ order }: { order: Order }) {
     <ol className="relative space-y-6 border-l border-border pl-6">
       {[...order.history].reverse().map((event, index) => {
         const isCurrent = index === 0
+
         return (
           <li key={`${event.status}-${event.timestamp}`} className="relative">
             <span

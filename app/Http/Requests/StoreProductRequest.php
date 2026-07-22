@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests;
 
+use App\Enum\ProductStatusEnum;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Arr;
+use Illuminate\Validation\Rules\Enum;
 
 class StoreProductRequest extends FormRequest
 {
@@ -28,13 +30,6 @@ class StoreProductRequest extends FormRequest
                 'string',
                 'max:255',
                 'unique:products,slug',
-            ],
-
-            'sku' => [
-                'required',
-                'string',
-                'max:100',
-                'unique:products,sku',
             ],
 
             'short_description' => [
@@ -85,71 +80,63 @@ class StoreProductRequest extends FormRequest
                 'max:100',
             ],
 
+         'status' => [
+            'required',
+            new Enum(ProductStatusEnum::class),
+        ],
             // Product Flags
-            'is_featured' => [
+            'flag_is_active' => [
                 'sometimes',
                 'boolean',
             ],
 
-            'is_new_arrival' => [
+            'flag_is_featured' => [
                 'sometimes',
                 'boolean',
             ],
 
-            'is_best_seller' => [
+            'flag_is_new_arrival' => [
                 'sometimes',
                 'boolean',
             ],
 
-            'is_limited_edition' => [
+            'flag_is_best_seller' => [
                 'sometimes',
                 'boolean',
             ],
 
-            'is_trending' => [
+            'flag_is_limited_edition' => [
                 'sometimes',
                 'boolean',
             ],
 
-            'is_active' => [
+            'flag_is_trending' => [
                 'sometimes',
                 'boolean',
             ],
 
             // Variants
             'variants' => [
-                'required',
                 'array',
                 'min:1',
             ],
 
             'variants.*.size' => [
-                'required',
                 'string',
                 'max:50',
             ],
 
             'variants.*.color' => [
-                'required',
                 'string',
                 'max:100',
-            ],
-
-            'variants.*.sku' => [
-                'required',
-                'string',
-                'max:100',
-                'unique:product_variants,sku',
             ],
 
             'variants.*.stock_quantity' => [
-                'required',
                 'integer',
                 'min:0',
             ],
 
             'variants.*.price_adjustment' => [
-                'required',
                 'numeric',
             ],
 
@@ -173,12 +160,12 @@ class StoreProductRequest extends FormRequest
     public function productData(): array
     {
         return Arr::except($this->validated(), [
-            'is_featured',
-            'is_new_arrival',
-            'is_best_seller',
-            'is_limited_edition',
-            'is_trending',
-            'is_active',
+            'flag_is_featured',
+            'flag_is_new_arrival',
+            'flag_is_best_seller',
+            'flag_is_limited_edition',
+            'flag_is_trending',
+            'flag_is_active',
             'variants',
             'images',
         ]);
@@ -187,12 +174,12 @@ class StoreProductRequest extends FormRequest
     public function flagData(): array
     {
         return [
-            'is_featured' => $this->boolean('is_featured'),
-            'is_new_arrival' => $this->boolean('is_new_arrival'),
-            'is_best_seller' => $this->boolean('is_best_seller'),
-            'is_limited_edition' => $this->boolean('is_limited_edition'),
-            'is_trending' => $this->boolean('is_trending'),
-            'is_active' => $this->boolean('is_active', true),
+            'is_featured' => $this->boolean('flag_is_featured'),
+            'is_new_arrival' => $this->boolean('flag_is_new_arrival'),
+            'is_best_seller' => $this->boolean('flag_is_best_seller'),
+            'is_limited_edition' => $this->boolean('flag_is_limited_edition'),
+            'is_trending' => $this->boolean('flag_is_trending'),
+            'is_active' => $this->boolean('flag_is_active', true),
         ];
     }
 

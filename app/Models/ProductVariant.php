@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Str;
 
 class ProductVariant extends Model
 {
@@ -14,7 +13,6 @@ class ProductVariant extends Model
         'color',
         'stock_quantity',
         'price_adjustment',
-        'sku',
     ];
 
     protected $casts = [
@@ -22,16 +20,7 @@ class ProductVariant extends Model
         'stock_quantity' => 'integer',
     ];
 
-    protected static function boot()
-    {
-        parent::boot();
 
-        static::creating(function ($variant) {
-            if (empty($variant->sku)) {
-                $variant->sku = strtoupper(Str::random(12));
-            }
-        });
-    }
 
     public function product(): BelongsTo
     {

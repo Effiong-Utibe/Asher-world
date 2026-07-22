@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Enum\ProductStatusEnum;
 use App\Http\Requests\StoreProductRequest;
+use App\Http\Requests\UpdateProductRequest;
 use App\Http\Resources\ProductResource;
 use App\Models\Department;
 use App\Models\Product;
@@ -16,22 +18,295 @@ class ProductController extends Controller
      * Display a listing of the resource.
      */
     public function index()
-    {
-        $products = Product::with(['category', 'variants'])
-            ->get()
-            ->map(fn ($product) => [
+{
+    $this->authorize('viewAny', Product::class);
+
+    $products = Product::query()
+        ->with([
+            'department',
+            'category',
+            'variants',
+            'flag',
+            'media',
+        ])
+        ->latest()
+        ->get()
+        ->map(function ($product) {
+
+            return [
+
+                /*
+                |--------------------------------------------------------------------------
+                | Product Information
+                |--------------------------------------------------------------------------
+                */
+
                 'id' => $product->id,
                 'name' => $product->name,
                 'slug' => $product->slug,
-                'sku' => $product->sku,
-                'price' => $product->price,
-                'final_price' => $product->final_price,
+                'short_description' => $product->short_description,
+                'description' => $product->description,
+                'material' => $product->material,
+                'color' => $product->color,
+
+                /*
+                |--------------------------------------------------------------------------
+                | Pricing
+                |--------------------------------------------------------------------------
+                */
+
+                'price' => (float) $product->price,
+
+                'discount_percent' => (float) $product->discount_percent,
+
+                'final_price' => (float) $product->final_price,
+
+                /*
+                |--------------------------------------------------------------------------
+                | Inventory
+                |--------------------------------------------------------------------------
+                */
+
                 'stock_quantity' => $product->stock_quantity,
-                'is_active' => $product->is_active,
-                'is_featured' => $product->is_featured,
-                'category' => $product->category ? ['id' => $product->category->id, 'name' => $product->category->name] : null,
+
+                /*
+                |--------------------------------------------------------------------------
+                | Status
+                |--------------------------------------------------------------------------
+                */
+
+                'status' => $product->status,
+
+                /*
+                |--------------------------------------------------------------------------
+                | Department
+                |--------------------------------------------------------------------------
+                */
+
+                'department' => $product->department
+                    ? [
+                        'id' => $product->department->id,
+                        'name' => $product->department->name,
+                    ]
+                    : null,
+
+                /*
+                |--------------------------------------------------------------------------
+                | Category
+                |--------------------------------------------------------------------------
+                */
+
+                'category' => $product->category
+                    ? [
+                        'id' => $product->category->id,
+                        'name' => $product->category->name,
+                    ]
+                    : null,
+
+                /*
+                |--------------------------------------------------------------------------
+                | Variants
+                |--------------------------------------------------------------------------
+                */
+
+                'variants' => $product->variants
+                    ->map(fn ($variant) => [
+                        'id' => $variant->id,
+                        'size' => $variant->size,
+                        'color' => $variant->color,
+                        'stock_quantity' => $variant->stock_quantity,
+                        'price_adjustment' => $variant->price_adjustment,
+
+                    ])
+                    ->values(),
+
+                /*
+                |--------------------------------------------------------------------------
+                | Flags
+                |--------------------------------------------------------------------------
+                */
+
+                'flags' => [
+                    'is_active' => optional($product->flag)->is_active,
+                    'is_featured' => optional($product->flag)->is_featured,
+                    'is_trending' => optional($product->flag)->is_trending,
+                    'is_new_arrival' => optional($product->flag)->is_new_arrival,
+                    'is_best_seller' => optional($product->flag)->is_best_seller,
+                    'is_limited_edition' => optional($product->flag)->is_limited_edition,
+                ],
+
+                /*
+                |--------------------------------------------------------------------------
+                | Images
+                |--------------------------------------------------------------------------
+                */
+
                 'image' => $product->getFirstMediaUrl('product_images'),
                 'images' => $product->getMedia('product_images')
+                    ->map(fn ($media) => [
+                        'id' => $media->id,
+                        'url' => $media->getUrl(),
+                        'thumbnail' => $media->hasGeneratedConversion('thumb')
+                            ? $media->getUrl('thumb')
+                            : $media->getUrl(),
+                    ])
+                    ->values(),
+            ];
+
+        });
+
+    return Inertia::render('admin/products/index', [
+        'products' => $products,
+        'departments' => Department::with('categories')->get(),
+        'statuses' => collect(ProductStatusEnum::cases())
+            ->map(fn ($status) => [
+                'value' => $status->value,
+                'label' => ProductStatusEnum::labels()[$status->value],
+                'color' => ProductStatusEnum::colors()[$status->value],
+            ]),
+    ]);
+}
+
+    /**
+     * Show the form for creating a new resource.
+     */
+    public function create()
+    {
+         $this->authorize('create', Product::class);
+        return Inertia::render('admin/products/create', [
+            // 'categories' => Category::select('id', 'name')->get()
+            'departments' => Department::with('categories')->get(),
+             'statuses' => collect(ProductStatusEnum::cases())->map(fn ($status) => [
+            'value' => $status->value,
+            'label' => ProductStatusEnum::labels()[$status->value],
+            'color' => ProductStatusEnum::colors()[$status->value],
+        ]),
+        ]);
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     */
+   public function store(StoreProductRequest $request)
+{
+       $this->authorize('create', Product::class);
+    $validated = $request->validated();
+
+    // Generate unique slug
+    $originalSlug = Str::slug($validated['name']);
+    $slug = $originalSlug;
+    $i = 1;
+
+    while (Product::where('slug','=', $slug)->exists()) {
+        $slug = "{$originalSlug}-{$i}";
+        $i++;
+    }
+
+
+    // Calculate final price
+    $price = (float) $validated['price'];
+    $discount = (float) $validated['discount_percent'];
+
+    $productData = $request->productData();
+
+    $productData['slug'] = $slug;
+    $productData['status'] = $validated['status'];
+    $productData['final_price'] = $price - (($price * $discount) / 100);
+    $product = Product::create($productData);
+    $product->flag()->create($request->flagData());
+
+    foreach ($validated['variants'] ?? [] as $variant) {
+        $product->variants()->create([
+            'size' => $variant['size'],
+            'color' => $variant['color'],
+            'stock_quantity' => $variant['stock_quantity'],
+            'price_adjustment' => $variant['price_adjustment'],
+        ]);
+    }
+
+    if ($request->hasFile('images')) {
+        foreach ($request->file('images') as $image) {
+            $product
+                ->addMedia($image)
+                ->toMediaCollection('product_images');
+        }
+    }
+
+    return redirect()
+        ->route('products.index')
+        ->with('success', 'Product created successfully.');
+}
+
+    /**
+     * Display the specified resource.
+     */
+    public function show(Product $product)
+    {
+         $this->authorize('view', $product);
+        // Single product payload built similarly to relatedProducts to ensure fields are present
+        $p = $product->load(['category', 'variants']);
+        $productPayload = [
+            'id' => $p->id,
+            'name' => $p->name,
+            'slug' => $p->slug,
+            // 'sku' => $p->sku,
+            'short_description' => $p->short_description,
+            'description' => $p->description,
+            'material' => $p->material,
+            'color' => $p->color,
+            'price' => $p->price,
+            'discount_percent' => $p->discount_percent,
+            'final_price' => $p->final_price,
+            'stock_quantity' => $p->stock_quantity,
+            'rating' => 0,
+            'review_count' => 0,
+            'is_active' => $p->is_active,
+            'is_featured' => $p->is_featured,
+            'is_new_arrival' => $p->is_new_arrival,
+            'is_best_seller' => $p->is_best_seller,
+            'is_limited_edition' => $p->is_limited_edition,
+            'is_trending' => $p->is_trending,
+            'category' => $p->category ? ['id' => $p->category->id, 'name' => $p->category->name] : null,
+            'category_id' => $p->category_id,
+            'department_id' => $p->department_id,
+            'sizes' => $p->variants->pluck('size')->filter()->unique()->values()->toArray(),
+            'colors' => $p->variants->pluck('color')->filter()->unique()->values()->toArray(),
+            'variants' => $p->variants->map(fn ($v) => [
+                'id' => $v->id,
+                'size' => $v->size,
+                'color' => $v->color,
+                // 'sku' => $v->sku,
+                'stock_quantity' => $v->stock_quantity,
+                'price_adjustment' => $v->price_adjustment,
+            ])->values()->toArray(),
+            'images' => $p->getMedia('product_images')
+                ->map(fn ($media) => [
+                    'id' => $media->id,
+                    'url' => $media->getUrl(),
+                    'thumbnail' => $media->hasGeneratedConversion('thumb') ? $media->getUrl('thumb') : $media->getUrl(),
+                ])->values()->toArray(),
+            'created_at' => $p->created_at ? $p->created_at->format('Y-m-d H:i:s') : '',
+            'updated_at' => $p->updated_at ? $p->updated_at->format('Y-m-d H:i:s') : '',
+        ];
+
+        // Related products (exclude current product)
+        $relatedProducts = Product::with(['category', 'variants'])
+            ->where('id', '!=', $product->id)
+            ->limit(8)
+            ->get()
+            ->map(fn ($p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'slug' => $p->slug,
+                // 'sku' => $p->sku,
+                'price' => $p->price,
+                'final_price' => $p->final_price,
+                'stock_quantity' => $p->stock_quantity,
+                'is_active' => $p->is_active,
+                'is_featured' => $p->is_featured,
+                'category' => $p->category ? ['id' => $p->category->id, 'name' => $p->category->name] : null,
+                'image' => $p->getFirstMediaUrl('product_images'),
+                'images' => $p->getMedia('product_images')
                     ->map(fn ($media) => [
                         'id' => $media->id,
                         'url' => $media->getUrl(),
@@ -43,89 +318,10 @@ class ProductController extends Controller
                     ->toArray(),
             ]);
 
-        return Inertia::render('admin/products/index', [
-            'products' => $products,
+        return Inertia::render('admin/products/show', [
+            'product' => $productPayload,
+            'relatedProducts' => $relatedProducts,
         ]);
-    }
-
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        return Inertia::render('admin/products/create', [
-            // 'categories' => Category::select('id', 'name')->get()
-            'departments' => Department::with('categories')->get(),
-        ]);
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(StoreProductRequest $request)
-    {
-        $validated = $request->validated();
-
-        // Generate unique slug
-        $originalSlug = Str::slug($validated['name']);
-        $slug = $originalSlug;
-        $count = 1;
-
-        // Ensure unique slug; include explicit operator and boolean to satisfy analyzer
-        while (Product::where('slug', '=', $slug, 'and')->exists()) {
-            $slug = $originalSlug.'-'.$count++;
-        }
-
-        $validated['slug'] = $slug;
-
-        // Calculate final price
-        $price = (float) $validated['price'];
-        $discountPercent = (float) $validated['discount_percent'];
-
-        $validated['final_price'] = $price - (
-            ($price * $discountPercent) / 100
-        );
-
-        // Create product
-
-        $product = Product::create($request->productData());
-
-        $product->flag()->create($request->flagData());
-
-        // Save variants
-        foreach ($validated['variants'] ?? [] as $variant) {
-            $product->variants()->create([
-                'size' => $variant['size'],
-                'color' => $variant['color'],
-                'stock_quantity' => $variant['stock_quantity'],
-                'price_adjustment' => $variant['price_adjustment'],
-                'sku' => $variant['sku'],
-            ]);
-        }
-
-        // Upload images
-        if ($request->hasFile('images')) {
-            foreach ($request->file('images') as $file) {
-                $product
-                    ->addMedia($file)
-                    ->toMediaCollection('product_images');
-            }
-        }
-
-        // return ProductResource::make($product);
-        return redirect()
-            ->route('admin.products.index')
-            ->with('success', 'Product created successfully.')
-            // ->json(new PostResource($post), 201);
-            ->with('product', ProductResource::make($product));
-    }
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(Product $product)
-    {
-        //
     }
 
     /**
@@ -133,118 +329,82 @@ class ProductController extends Controller
      */
     public function edit(Product $product)
     {
-       
-    return Inertia::render('admin/products/edit', [
-        'product' => (new ProductResource(
-            $product->load([
-                'category',
-                'department',
-                'variants'
-            ])
-        ))->resolve(),
+    $this->authorize('update', $product);
+        return Inertia::render('admin/products/edit', [
+            'product' => (new ProductResource(
+                $product->load([
+                    'category',
+                    'department',
+                    'variants',
+                ])
+            ))->resolve(),
 
-        'departments' => Department::with('categories')->get(),
-    ]);
+            'departments' => Department::with('categories')->get(),
+        ]);
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Product $product)
-    {
-        // Validate incoming data
-        $validated = $request->validate([
-            'category_id' => ['nullable', 'exists:categories,id'],
-            'name' => ['required', 'string', 'max:255'],
-            'slug' => ['required', 'string', 'max:255', 'unique:products,slug,'.$product->id],
-            'sku' => ['required', 'string', 'max:100', 'unique:products,sku,'.$product->id],
-            'short_description' => ['required', 'string', 'max:500'],
-            'description' => ['required', 'string'],
-            'material' => ['nullable', 'string', 'max:255'],
-            'color' => ['nullable', 'string', 'max:100'],
-            'price' => ['required', 'numeric', 'min:0'],
-            'stock_quantity' => ['required', 'integer', 'min:0'],
-            'discount_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
-            'is_featured' => ['boolean'],
-            'is_new_arrival' => ['boolean'],
-            'is_best_seller' => ['boolean'],
-            'is_limited_edition' => ['boolean'],
-            'is_trending' => ['boolean'],
-            'is_active' => ['boolean'],
-            'variants' => ['nullable', 'array'],
-            'variants.*.size' => ['nullable', 'string', 'max:50'],
-            'variants.*.color' => ['nullable', 'string', 'max:100'],
-            'variants.*.sku' => ['nullable', 'string', 'max:100'],
-            'variants.*.stock_quantity' => ['nullable', 'integer', 'min:0'],
-            'variants.*.price_adjustment' => ['nullable', 'numeric'],
-        ]);
+public function update(UpdateProductRequest $request, Product $product)
+{
+    $this->authorize('update', $product);
 
-        // Calculate final price
-        $price = (float) $validated['price'];
-        $discountPercent = (float) ($validated['discount_percent'] ?? 0);
-        $validated['final_price'] = $price - (($price * $discountPercent) / 100);
+    $validated = $request->validated();
 
-        // Update product attributes
-        $product->fill([
-            'category_id' => $validated['category_id'] ?? null,
-            'name' => $validated['name'],
-            'slug' => $validated['slug'],
-            'sku' => $validated['sku'],
-            'short_description' => $validated['short_description'],
-            'description' => $validated['description'],
-            'material' => $validated['material'] ?? null,
-            'color' => $validated['color'] ?? null,
-            'price' => $validated['price'],
-            'discount_percent' => $validated['discount_percent'] ?? 0,
-            'final_price' => $validated['final_price'],
-            'stock_quantity' => $validated['stock_quantity'],
-            'is_featured' => $validated['is_featured'] ?? false,
-            'is_new_arrival' => $validated['is_new_arrival'] ?? false,
-            'is_best_seller' => $validated['is_best_seller'] ?? false,
-            'is_limited_edition' => $validated['is_limited_edition'] ?? false,
-            'is_trending' => $validated['is_trending'] ?? false,
-            'is_active' => $validated['is_active'] ?? true,
-        ]);
+    $price = (float) $validated['price'];
+    $discount = (float) ($validated['discount_percent'] ?? 0);
 
-        // Update or create flag
-        $product->flag()->updateOrCreate(
-            ['product_id' => $product->id],
-            [
-                'is_featured' => $validated['is_featured'] ?? false,
-                'is_new_arrival' => $validated['is_new_arrival'] ?? false,
-                'is_best_seller' => $validated['is_best_seller'] ?? false,
-                'is_limited_edition' => $validated['is_limited_edition'] ?? false,
-                'is_trending' => $validated['is_trending'] ?? false,
-            ]
-        );
+    $productData = $request->productData();
+    $productData['final_price'] = $price - (($price * $discount) / 100);
 
-        // Handle variants
-        if (isset($validated['variants']) && is_array($validated['variants'])) {
-            // Delete existing variants and recreate
-            $product->variants()->delete();
+    $product->update($productData);
 
-            foreach ($validated['variants'] as $variantData) {
-                $product->variants()->create([
-                    'size' => $variantData['size'] ?? null,
-                    'color' => $variantData['color'] ?? null,
-                    'sku' => $variantData['sku'] ?? null,
-                    'stock_quantity' => $variantData['stock_quantity'] ?? 0,
-                    'price_adjustment' => $variantData['price_adjustment'] ?? 0,
-                ])->save();
-            }
+    $product->flag()->updateOrCreate(
+        ['product_id' => $product->id],
+        $request->flagData()
+    );
+
+    if (! empty($validated['variants'])) {
+
+        $product->variants()->delete();
+
+        foreach ($validated['variants'] as $variant) {
+
+            $product->variants()->create([
+                'size' => $variant['size'] ?? null,
+                'color' => $variant['color'] ?? null,
+                'stock_quantity' => $variant['stock_quantity'] ?? 0,
+                'price_adjustment' => $variant['price_adjustment'] ?? 0,
+            ]);
         }
-
-        return redirect()
-            ->route('admin.products.index')
-            ->with('success', 'Product updated successfully.')
-            ->with('product', ProductResource::make($product->fresh(['category', 'variants'])));
     }
 
+    if ($request->hasFile('images')) {
+
+        $product->clearMediaCollection('product_images');
+
+        foreach ($request->file('images') as $image) {
+
+            $product
+                ->addMedia($image)
+                ->toMediaCollection('product_images');
+        }
+    }
+
+    return redirect()
+        ->route('products.index')
+        ->with('success', 'Product updated successfully.');
+}
     /**
      * Remove the specified resource from storage.
      */
     public function destroy(Product $product)
     {
-        //
+        $this->authorize('delete', $product);
+        $product->clearMediaCollection('product_images');
+        $product->delete('product');
+
+        return redirect()->route('products.index')->with('message', 'product deleted successfully');
     }
 }

@@ -1,12 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
 import { Search, X, ShoppingCart, Heart, Star } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 
 interface Product {
     id: number;
@@ -64,7 +64,9 @@ export default function ProductSearch() {
     const [query, setQuery] = useState('');
 
     const filteredProducts = useMemo(() => {
-        if (!query) return [];
+        if (!query) {
+return [];
+}
 
         return products.filter(
             (product) =>

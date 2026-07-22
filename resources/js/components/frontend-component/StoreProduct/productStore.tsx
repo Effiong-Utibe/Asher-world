@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Tag } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
 
-import { sampleProducts } from './product-data';
-import type { Product } from './types';
-import ProductCard from './productCard';
 import { Button } from '@/components/ui/button';
+import { sampleProducts } from './product-data';
+import ProductCard from './productCard';
+import type { Product } from './types';
 
 export default function ProductStore() {
     const [products, setProducts] = useState<Product[]>(sampleProducts);
@@ -37,6 +37,7 @@ export default function ProductStore() {
     // Ensure current index never exceeds available slide range
     useEffect(() => {
         const maxIndex = Math.max(0, products.length - visibleProducts);
+
         if (currentIndex > maxIndex) {
             setCurrentIndex(maxIndex);
         }
@@ -80,7 +81,9 @@ export default function ProductStore() {
 
     // Auto-slide
     useEffect(() => {
-        if (products.length <= visibleProducts) return;
+        if (products.length <= visibleProducts) {
+return;
+}
 
         const interval = setInterval(() => {
             setCurrentIndex((prev) => (prev + 1 >= totalSlides ? 0 : prev + 1));

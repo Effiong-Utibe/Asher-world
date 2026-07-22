@@ -7,11 +7,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
-
-class Department extends Model
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+class Department extends Model  implements HasMedia
 {
     /** @use HasFactory<DepartmentFactory> */
-    use HasFactory;
+    use HasFactory,InteractsWithMedia;
 
     protected $fillable = [
         'name',
@@ -42,6 +43,10 @@ class Department extends Model
         });
     }
 
+public function products(): HasMany
+{
+    return $this->hasMany(Product::class);
+}
     public function categories(): HasMany
     {
         return $this->hasMany(Category::class);

@@ -17,6 +17,7 @@ class DepartmentSeeder extends Seeder
             [
                 'name' => 'Men',
                 'slug' => Str::slug('Men'),
+                'image' => 'departments/men.jpg',
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
@@ -25,21 +26,25 @@ class DepartmentSeeder extends Seeder
             [
                 'name' => 'Women',
                 'slug' => Str::slug('Women'),
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'name' => 'Unisex',
-                'slug' => Str::slug('Unisex'),
+                'image' => 'departments/women.jpg',
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
 
             [
-                'name' => 'Kids $ baby',
-                'slug' => Str::slug('Kids & baby'),
+                'name' => 'Unisex',
+                'slug' => Str::slug('Unisex'),
+                'image' => 'departments/unisex.jpg',
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+
+            [
+                'name' => 'Kids & Baby',
+                'slug' => Str::slug('Kids & Baby'),
+                'image' => 'departments/kids-baby.jpg',
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
@@ -48,6 +53,7 @@ class DepartmentSeeder extends Seeder
             [
                 'name' => 'Footwear',
                 'slug' => Str::slug('Footwear'),
+                'image' => 'departments/footwear.jpg',
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
@@ -56,6 +62,7 @@ class DepartmentSeeder extends Seeder
             [
                 'name' => 'Accessories',
                 'slug' => Str::slug('Accessories'),
+                'image' => 'departments/accessories.jpg',
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
@@ -64,6 +71,7 @@ class DepartmentSeeder extends Seeder
             [
                 'name' => 'Luxury Collection',
                 'slug' => Str::slug('Luxury Collection'),
+                'image' => 'departments/luxury-collection.jpg',
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
@@ -72,6 +80,7 @@ class DepartmentSeeder extends Seeder
             [
                 'name' => 'Sportswear',
                 'slug' => Str::slug('Sportswear'),
+                'image' => 'departments/sportswear.jpg',
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
@@ -80,6 +89,7 @@ class DepartmentSeeder extends Seeder
             [
                 'name' => 'Beauty & Grooming',
                 'slug' => Str::slug('Beauty & Grooming'),
+                'image' => 'departments/beauty-grooming.jpg',
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
@@ -88,11 +98,11 @@ class DepartmentSeeder extends Seeder
             [
                 'name' => 'Trending Collections',
                 'slug' => Str::slug('Trending Collections'),
+                'image' => 'departments/trending-collections.jpg',
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
-
         ];
 
         DB::table('departments')->insert($departments);

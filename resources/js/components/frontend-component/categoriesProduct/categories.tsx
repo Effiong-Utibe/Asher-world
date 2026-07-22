@@ -1,6 +1,5 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
 import {
     ChevronLeft,
     ChevronRight,
@@ -8,8 +7,9 @@ import {
     ShoppingBag,
     Star,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface CategoryItem {
     id: number;
@@ -297,10 +297,14 @@ export default function Category() {
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
-        if (!isDragging) return;
+        if (!isDragging) {
+return;
+}
+
         e.preventDefault();
         const x = e.pageX - (carouselRef.current?.offsetLeft || 0);
         const walk = (x - startX) * 2; // Scroll speed multiplier
+
         if (carouselRef.current) {
             carouselRef.current.scrollLeft = scrollLeft - walk;
         }
@@ -316,7 +320,9 @@ export default function Category() {
 
     // Handle scroll buttons
     const scroll = (direction: 'left' | 'right') => {
-        if (isAnimating || !carouselRef.current) return;
+        if (isAnimating || !carouselRef.current) {
+return;
+}
 
         setIsAnimating(true);
 

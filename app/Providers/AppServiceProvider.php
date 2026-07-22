@@ -2,11 +2,14 @@
 
 namespace App\Providers;
 
+use App\Models\Product;
+use App\Policies\ProductPolicy;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Support\Facades\Gate;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -24,6 +27,10 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+         Gate::policy(Product::class, ProductPolicy::class);
+          Gate::before(function ($user, $ability) {
+        return $user->hasRole('Admin') ? true : null;
+    });
     }
 
     /**
@@ -47,4 +54,5 @@ class AppServiceProvider extends ServiceProvider
             : null,
         );
     }
+
 }

@@ -10,10 +10,11 @@ import {
     STATUS_FLOW,
     STATUS_META,
     formatCurrency,
-    formatDate,
-    type Order,
-    type OrderStatus,
+    formatDate
+    
+    
 } from '@/lib/orders';
+import type {Order, OrderStatus} from '@/lib/orders';
 
 // Renders the selected order details, including delivery progress, shipment info,
 // item totals, and tracking history.
@@ -178,6 +179,9 @@ function InfoCard({
 
 // Preserve the display format while allowing a placeholder value for cancelled orders.
 function formatDate2(value: string) {
-    if (value === '—') return value;
+    if (value === '—') {
+return value;
+}
+
     return formatDate(value);
 }

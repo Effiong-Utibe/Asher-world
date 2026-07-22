@@ -117,7 +117,9 @@ export default function Edit({ product }: EditProps) {
     };
 
     const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
-        if (!e.target.files) return;
+        if (!e.target.files) {
+return;
+}
 
         const files = Array.from(e.target.files);
         const newImages = [...images, ...files];
@@ -184,6 +186,7 @@ export default function Edit({ product }: EditProps) {
             onProgress: (event) => {
                 if (!event) {
                     setProgress(null);
+
                     return;
                 }
 
@@ -212,6 +215,7 @@ export default function Edit({ product }: EditProps) {
     const finalPrice = useMemo(() => {
         const price = Number(data.price || 0);
         const discount = Number(data.discount_percent || 0);
+
         return price - (price * discount) / 100;
     }, [data.price, data.discount_percent]);
 

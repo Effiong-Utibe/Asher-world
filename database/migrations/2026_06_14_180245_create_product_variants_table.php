@@ -16,9 +16,8 @@ return new class extends Migration
             $table->foreignId('product_id')->constrained()->cascadeOnDelete();
             $table->string('size')->nullable();
             $table->string('color')->nullable();
-            $table->integer('stock_quantity')->default(0);
-            $table->decimal('price_adjustment', 10, 2)->default(0);
-            $table->string('sku')->unique();
+            $table->integer('stock_quantity')->default(null);
+            $table->decimal('price_adjustment', 10, 2)->default(null);
             $table->index(['product_id', 'size', 'color']);
             $table->timestamps();
         });

@@ -1,0 +1,370 @@
+import { Head } from '@inertiajs/react';
+import {
+    Heart,
+    ShoppingCart,
+    Share2,
+    Star,
+    Plus,
+    Minus,
+    Truck,
+    ShieldCheck,
+    RotateCcw,
+} from 'lucide-react';
+import { useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import AppLayout from '@/layouts/app-layout';
+
+interface ProductImage {
+    id: number;
+    url: string;
+}
+
+interface Product {
+    id: number;
+    name: string;
+    slug: string;
+    description: string;
+    short_description: string;
+    material: string;
+    color: string;
+    price: number;
+    final_price: number;
+    discount_percent: number;
+    stock_quantity: number;
+    rating?: number;
+    review_count?: number;
+    images?: ProductImage[];
+    sizes?: string[];
+    colors?: string[];
+}
+
+interface Props {
+    product: Product;
+    relatedProducts: Product[];
+}
+
+export default function Show({ product, relatedProducts }: Props) {
+    const images = product.images ?? [];
+    const sizes = product.sizes ?? [];
+    const colors = product.colors ?? [];
+    const [selectedImage, setSelectedImage] = useState(images[0]?.url ?? '');
+    const [quantity, setQuantity] = useState(1);
+    const [size, setSize] = useState(sizes[0] ?? '');
+    const [color, setColor] = useState(colors[0] ?? '');
+
+    return (
+        <>
+            <Head title={product.name} />
+
+            <div className="container mx-auto px-4 py-10">
+                <div className="grid gap-10 lg:grid-cols-2">
+                    {/* Images */}
+
+                    <div>
+                        <Card>
+                            <CardContent className="p-4">
+                                <img
+                                    src={selectedImage}
+                                    className="aspect-square w-full rounded-lg object-cover"
+                                />
+                            </CardContent>
+                        </Card>
+
+                        <div className="mt-4 flex gap-3 overflow-x-auto">
+                            {images.length > 0 ? (
+                                images.map((image) => (
+                                    <button
+                                        key={image.id}
+                                        onClick={() =>
+                                            setSelectedImage(image.url)
+                                        }
+                                    >
+                                        <img
+                                            src={image.url}
+                                            className={`h-24 w-24 rounded-md border object-cover ${
+                                                selectedImage === image.url
+                                                    ? 'border-primary'
+                                                    : ''
+                                            }`}
+                                        />
+                                    </button>
+                                ))
+                            ) : (
+                                <div className="text-sm text-muted-foreground">
+                                    No images available.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Product Details */}
+
+                    <div>
+                        <Badge>
+                            {product.stock_quantity > 0
+                                ? 'In Stock'
+                                : 'Out of Stock'}
+                        </Badge>
+
+                        <h1 className="mt-4 text-4xl font-bold">
+                            {product.name}
+                        </h1>
+
+                        <div className="mt-4 flex items-center gap-2">
+                            <Star
+                                className="fill-yellow-500 text-yellow-500"
+                                size={18}
+                            />
+
+                            <span>{product.rating ?? 0}</span>
+
+                            <span className="text-muted-foreground">
+                                ({product.review_count ?? 0} Reviews)
+                            </span>
+                        </div>
+
+                        <div className="mt-6 flex items-center gap-4">
+                            <span className="text-4xl font-bold">
+                                ${product.final_price}
+                            </span>
+
+                            {product.discount_percent > 0 && (
+                                <>
+                                    <span className="text-xl text-muted-foreground line-through">
+                                        ${product.price}
+                                    </span>
+
+                                    <Badge>-{product.discount_percent}%</Badge>
+                                </>
+                            )}
+                        </div>
+
+                        <p className="mt-6 text-muted-foreground">
+                            {product.short_description}
+                        </p>
+
+                        <Separator className="my-6" />
+
+                        {/* Colors */}
+
+                        <div>
+                            <h3 className="mb-3 font-semibold">Color</h3>
+
+                            {colors.length > 0 ? (
+                                <RadioGroup
+                                    value={color}
+                                    onValueChange={setColor}
+                                    className="flex gap-3"
+                                >
+                                    {colors.map((item) => (
+                                        <div key={item}>
+                                            <RadioGroupItem
+                                                value={item}
+                                                id={item}
+                                                className="peer sr-only"
+                                            />
+
+                                            <Label
+                                                htmlFor={item}
+                                                className="cursor-pointer rounded-md border px-4 py-2 peer-data-[state=checked]:border-primary"
+                                            >
+                                                {item}
+                                            </Label>
+                                        </div>
+                                    ))}
+                                </RadioGroup>
+                            ) : (
+                                <div className="text-sm text-muted-foreground">
+                                    No color variations available.
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="mt-8">
+                            <h3 className="mb-3 font-semibold">Size</h3>
+
+                            <RadioGroup
+                                value={size}
+                                onValueChange={setSize}
+                                className="flex gap-3"
+                            >
+                                {sizes.length > 0 ? (
+                                    sizes.map((item) => (
+                                        <div key={item}>
+                                            <RadioGroupItem
+                                                value={item}
+                                                id={item}
+                                                className="peer sr-only"
+                                            />
+
+                                            <Label
+                                                htmlFor={item}
+                                                className="cursor-pointer rounded-md border px-4 py-2 peer-data-[state=checked]:border-primary"
+                                            >
+                                                {item}
+                                            </Label>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="text-sm text-muted-foreground">
+                                        No sizes available.
+                                    </div>
+                                )}
+                            </RadioGroup>
+                        </div>
+
+                        <div className="mt-8">
+                            <h3 className="mb-3 font-semibold">Quantity</h3>
+
+                            <div className="flex w-36 items-center">
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() =>
+                                        quantity > 1 &&
+                                        setQuantity(quantity - 1)
+                                    }
+                                >
+                                    <Minus size={18} />
+                                </Button>
+
+                                <Input
+                                    value={quantity}
+                                    readOnly
+                                    className="mx-2 text-center"
+                                />
+
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() => setQuantity(quantity + 1)}
+                                >
+                                    <Plus size={18} />
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="mt-8 flex flex-wrap gap-3">
+                            <Button className="flex-1" size="lg">
+                                <ShoppingCart className="mr-2 h-5 w-5" />
+                                Add to Cart
+                            </Button>
+
+                            <Button variant="secondary" size="lg">
+                                Buy Now
+                            </Button>
+
+                            <Button variant="outline" size="icon">
+                                <Heart />
+                            </Button>
+
+                            <Button variant="outline" size="icon">
+                                <Share2 />
+                            </Button>
+                        </div>
+
+                        <div className="mt-10 space-y-4">
+                            <div className="flex items-center gap-3">
+                                <Truck />
+
+                                <span>Free Shipping</span>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <ShieldCheck />
+
+                                <span>Secure Payment</span>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <RotateCcw />
+
+                                <span>30 Days Return Policy</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <Tabs defaultValue="description" className="mt-16">
+                    <TabsList>
+                        <TabsTrigger value="description">
+                            Description
+                        </TabsTrigger>
+
+                        <TabsTrigger value="specifications">
+                            Specifications
+                        </TabsTrigger>
+
+                        <TabsTrigger value="reviews">Reviews</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="description">
+                        <Card>
+                            <CardContent className="p-6">
+                                {product.description}
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    <TabsContent value="specifications">
+                        <Card>
+                            <CardContent className="space-y-3 p-6">
+                                <div>Material: {product.material}</div>
+
+                                <div>Color: {product.color}</div>
+
+                                <div>Stock: {product.stock_quantity}</div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    <TabsContent value="reviews">
+                        <Card>
+                            <CardContent className="p-6">
+                                Customer reviews will appear here.
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                </Tabs>
+
+                <section className="mt-20">
+                    <h2 className="mb-8 text-3xl font-bold">
+                        Related Products
+                    </h2>
+
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                        {relatedProducts.map((item) => (
+                            <Card key={item.id}>
+                                <CardContent className="p-4">
+                                    <img
+                                        src={item.images[0]?.url}
+                                        className="aspect-square rounded-lg object-cover"
+                                    />
+
+                                    <h3 className="mt-4 font-semibold">
+                                        {item.name}
+                                    </h3>
+
+                                    <p className="font-bold">
+                                        ${item.final_price}
+                                    </p>
+
+                                    <Button className="mt-4 w-full">
+                                        View Product
+                                    </Button>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+                </section>
+            </div>
+        </>
+    );
+}

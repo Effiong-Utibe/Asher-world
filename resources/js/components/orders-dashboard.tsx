@@ -1,21 +1,22 @@
 'use client';
 
 // Client-side dashboard for listing orders and selecting orders for review.
-import { useMemo, useState } from 'react';
 import { ChevronRight, Search } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { OrderDetail } from '@/components/order-detail';
 import { StatusBadge } from '@/components/status-badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
     ORDERS,
     STATUS_META,
     formatCurrency,
-    formatDate,
-    type Order,
-    type OrderStatus,
+    formatDate
+    
+    
 } from '@/lib/orders';
+import type {Order, OrderStatus} from '@/lib/orders';
 import { cn } from '@/lib/utils';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 
 type Filter = OrderStatus | 'all';
 
@@ -55,6 +56,7 @@ export function OrdersDashboard() {
                 o.id.toLowerCase().includes(q) ||
                 o.customer.toLowerCase().includes(q) ||
                 o.trackingNumber.toLowerCase().includes(q);
+
             return matchesFilter && matchesQuery;
         });
     }, [orders, filter, query]);

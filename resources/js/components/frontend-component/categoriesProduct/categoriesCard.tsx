@@ -1,9 +1,9 @@
 'use client'
+import { Link } from '@inertiajs/react';
 import { ShoppingBag, Star } from 'lucide-react';
 // Use standard img to avoid dependency on next/image types
-import { CategoryItem } from './types';
 import { cn } from '@/lib/utils';
-import { Link } from '@inertiajs/react';
+import type { CategoryItem } from './types';
 
 interface CategoryCardProps {
     category: CategoryItem;

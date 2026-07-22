@@ -1,7 +1,4 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-import { Link } from '@inertiajs/react';
+import { Link, router, usePage,} from '@inertiajs/react';
 
 import {
     Search,
@@ -12,31 +9,55 @@ import {
     Heart,
     ChevronDown,
 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
-import { cn } from '@/lib/utils';
+import AppLogoIcon from '@/components/app-logo-icon';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+
+import { cn } from '@/lib/utils';
+import { PageProps } from '@inertiajs/core';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
+    DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-
-import AppLogoIcon from '@/components/app-logo-icon';
+import products from '@/routes/products';
+import admin from '@/routes/admin';
 
 /* -------------------------------------------------------------------------- */
 /* CONFIG                                                                     */
 /* -------------------------------------------------------------------------- */
+interface Category {
+    id: number;
+    name: string;
+    slug: string;
+}
 
-const CATEGORIES = [
-    'Electronics',
-    'Clothing',
-    'Home & Garden',
-    'Sports',
-    'Beauty',
-    'Luxury',
-];
+interface SharedProps extends PageProps {
+    categories: Category[];
+    cartCount: number;
+    wishlistCount: number;
+    unreadNotifications: number;
+
+    auth: {
+        user: {
+            id: number;
+            name: string;
+            email?: string;
+            role?: string;
+            is_admin?: boolean;
+        } | null;
+    };
+
+    settings: {
+        site_name: string;
+        logo: string;
+    };
+}
+
 
 const NAV_LINKS = [
     { label: 'New In', href: '/products?sort=new' },
@@ -68,7 +89,7 @@ function NavIconButton({
             <div className="relative rounded-2xl p-3 transition hover:bg-zinc-100 dark:hover:bg-zinc-800">
                 {icon}
 
-                {badge ? (
+                {badge !== undefined && badge > 0 ? (
                     <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-black text-[10px] text-white dark:bg-white dark:text-black">
                         {badge}
                     </span>
@@ -96,13 +117,29 @@ function NavIconButton({
 /* -------------------------------------------------------------------------- */
 /* SEARCH BAR                                                                 */
 /* -------------------------------------------------------------------------- */
-
-function SearchBar() {
+interface SearchBarProps {
+    categories: Category[];
+}
+function SearchBar({ categories }: SearchBarProps) {
     const [query, setQuery] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState<string>('');
+    const search = () => {
+        router.get(
+            '/products',
+            {
+                search: query,
+                category: selectedCategory,
+            },
+            {
+                preserveState: true,
+                preserveScroll: true,
+            },
+        );
+    };
 
     return (
         <div className="hidden flex-1 px-8 lg:flex">
-            <div className="flex h-14 w-full overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm ">
+            <div className="flex h-14 w-full overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
                 {/* Category */}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -110,14 +147,26 @@ function SearchBar() {
                             variant="secondary"
                             className="h-full rounded-none border-r border-zinc-200 bg-zinc-50 px-5 text-sm dark:border-zinc-800 dark:bg-zinc-950"
                         >
-                            Categories
+                            {selectedCategory
+                                ? categories.find(
+                                      (c) => c.slug === selectedCategory,
+                                  )?.name
+                                : 'Categories'}
+
                             <ChevronDown className="ml-2 h-4 w-4" />
                         </Button>
                     </DropdownMenuTrigger>
 
                     <DropdownMenuContent className="w-60 rounded-2xl p-2">
-                        {CATEGORIES.map((c) => (
-                            <DropdownMenuItem key={c}>{c}</DropdownMenuItem>
+                        {categories.map((category) => (
+                            <DropdownMenuItem
+                                key={category.id}
+                                onClick={() =>
+                                    setSelectedCategory(category.slug)
+                                }
+                            >
+                                {category.name}
+                            </DropdownMenuItem>
                         ))}
                     </DropdownMenuContent>
                 </DropdownMenu>
@@ -129,11 +178,17 @@ function SearchBar() {
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Search products..."
                         className="h-full border-0 bg-transparent px-5 pr-14 focus:ring-0"
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                search();
+                            }
+                        }}
                     />
 
                     <Button
                         size="icon"
                         className="absolute top-2 right-2 h-10 w-10 rounded-xl text-white"
+                        onClick={search}
                     >
                         <Search className="h-4 w-4" />
                     </Button>
@@ -150,12 +205,16 @@ function SearchBar() {
 function MobileSidebar({
     open,
     onClose,
+    auth,
 }: {
     open: boolean;
     onClose: () => void;
+    auth: SharedProps['auth'];
 }) {
-    if (!open) return null;
-
+    if (!open) {
+        return null;
+    }
+const isAdmin = auth.user?.is_admin || auth.user?.role === 'admin';
     return (
         <>
             <div
@@ -182,6 +241,45 @@ function MobileSidebar({
                             {link.label}
                         </Link>
                     ))}
+
+                    {auth.user && (
+                        <>
+                            <div className="my-4 border-t" />
+
+                            <Link
+                                href="/account"
+                                onClick={onClose}
+                                className="rounded-xl px-4 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                            >
+                                Profile
+                            </Link>
+
+                            {isAdmin && (
+                                <Link
+                                    href={products.index()}
+                                    onClick={onClose}
+                                    className="rounded-xl px-4 py-3 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                                >
+                                    Dashboard
+                                </Link>
+                            )}
+
+                            <button
+                                onClick={() =>
+                                    router.post(
+                                        '/logout',
+                                        {},
+                                        {
+                                            preserveScroll: true,
+                                        },
+                                    )
+                                }
+                                className="rounded-xl px-4 py-3 text-left text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+                            >
+                                Logout
+                            </button>
+                        </>
+                    )}
                 </div>
             </aside>
         </>
@@ -218,9 +316,26 @@ export default function NavBar() {
     const [isScrolled, setIsScrolled] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
 
+
+const {
+    categories = [],
+    cartCount = 0,
+    wishlistCount = 0,
+    auth,
+    settings,
+} = usePage<SharedProps>().props;
+
+const isAdmin = auth.user?.is_admin || auth.user?.role === 'admin';
+console.log('Auth:', auth);
+console.log('User:', auth.user);
+console.log('Role:', auth.user?.role);
+console.log('Is Admin:', auth.user?.is_admin);
+console.log('Computed isAdmin:', isAdmin);
+console.log(auth.user);
     useEffect(() => {
         const onScroll = () => setIsScrolled(window.scrollY > 10);
         window.addEventListener('scroll', onScroll);
+
         return () => window.removeEventListener('scroll', onScroll);
     }, []);
 
@@ -260,16 +375,15 @@ export default function NavBar() {
                                 </div>
 
                                 <div className="hidden sm:block">
-                                    <p className="font-bold">Asher World</p>
-                                    <p className="text-xs text-zinc-500">
-                                        Luxury Fashion
+                                    <p className="font-bold">
+                                        {settings.site_name}
                                     </p>
                                 </div>
                             </Link>
                         </div>
 
                         {/* CENTER */}
-                        <SearchBar />
+                        <SearchBar categories={categories} />
 
                         {/* RIGHT */}
                         <div className="flex items-center gap-2">
@@ -277,20 +391,83 @@ export default function NavBar() {
                                 <NavIconButton
                                     href="/wishlist"
                                     icon={<Heart size={20} />}
-                                    badge={3}
+                                    badge={wishlistCount}
                                 />
                             </div>
 
-                            <NavIconButton
-                                href="/account"
-                                icon={<User size={20} />}
-                                badge={1}
-                            />
+                            {auth.user ? (
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button
+                                            variant="ghost"
+                                            className="flex items-center gap-2 rounded-xl"
+                                        >
+                                            <User size={20} />
+                                            <span className="hidden md:inline">
+                                                {auth.user.name}
+                                            </span>
+                                        </Button>
+                                    </DropdownMenuTrigger>
+
+                                    <DropdownMenuContent
+                                        align="end"
+                                        className="w-56"
+                                    >
+                                        <DropdownMenuItem asChild>
+                                            <Link href="/account">Profile</Link>
+                                        </DropdownMenuItem>
+
+                                        <DropdownMenuItem asChild>
+                                            <Link href="/settings/profile">
+                                                Settings
+                                            </Link>
+                                        </DropdownMenuItem>
+
+                                        {isAdmin && (
+                                            <>
+                                                <DropdownMenuSeparator />
+
+                                                <DropdownMenuItem asChild>
+                                                    <Link
+                                                        href={products.index()}
+                                                    >
+                                                        Dashboard
+                                                    </Link>
+                                                </DropdownMenuItem>
+                                            </>
+                                        )}
+
+                                        <DropdownMenuSeparator />
+
+                                        <DropdownMenuItem
+                                            onClick={() =>
+                                                router.post(
+                                                    '/logout',
+                                                    {},
+                                                    {
+                                                        preserveScroll: true,
+                                                    },
+                                                )
+                                            }
+                                            className="text-red-600"
+                                        >
+                                            Logout
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            ) : (
+                                <NavIconButton
+                                    href="/login"
+                                    icon={<User size={20} />}
+                                    label="Login"
+                                    sublabel="Sign In"
+                                />
+                            )}
 
                             <NavIconButton
-                                href="/cart"
+                                href={'/cart'}
                                 icon={<ShoppingCart size={20} />}
-                                badge={2}
+                                badge={cartCount}
                             />
                         </div>
                     </div>
@@ -301,9 +478,9 @@ export default function NavBar() {
 
             <MobileSidebar
                 open={mobileOpen}
+                auth={auth}
                 onClose={() => setMobileOpen(false)}
             />
-
             <div className={isScrolled ? 'h-16' : 'h-24'} />
         </>
     );

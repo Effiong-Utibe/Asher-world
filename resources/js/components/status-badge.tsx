@@ -1,4 +1,5 @@
-import { STATUS_META, type OrderStatus } from "@/lib/orders"
+import { STATUS_META  } from "@/lib/orders"
+import type {OrderStatus} from "@/lib/orders";
 import { cn } from "@/lib/utils"
 
 const TONE_CLASSES: Record<string, string> = {
@@ -18,6 +19,7 @@ export function StatusBadge({
   className?: string
 }) {
   const meta = STATUS_META[status]
+
   return (
     <span
       className={cn(

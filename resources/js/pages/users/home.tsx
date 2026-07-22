@@ -1,8 +1,11 @@
 import { Head, Link } from '@inertiajs/react';
-import Frontend from '@/layouts/front-end-layout';
 import Category from '@/components/frontend-component/categoriesProduct/categories';
 import ProductStore from '@/components/frontend-component/StoreProduct/productStore';
 import { Button } from '@/components/ui/button';
+import Frontend from '@/layouts/front-end-layout';
+import { product_list } from '@/actions/App/Http/Controllers/UserproductController';
+import { categories } from '@/routes/users/products';
+
 
 export default function Home() {
     const heroImages = [
@@ -44,13 +47,13 @@ export default function Home() {
                             <Button
                             variant="default"
                             className="inline-flex items-center justify-center rounded-lg px-6 py-5 text-sm font-semibold text-white shadow-sm transition">
-                                <Link href="/shop">Shop Now</Link>
+                                <Link href={product_list()}>Shop Now</Link>
                             </Button>
                             <Button
                                 variant="outline"
                                 className="inline-flex items-center justify-center rounded-lg px-6 py-5 text-sm font-semibold text-gray-700 shadow-sm transition "
                             >
-                                <Link href="/categories">Browse Categories</Link>
+                                <Link href={categories()}>Browse Categories</Link>
                             </Button>
 
                         </div>
@@ -123,7 +126,7 @@ export default function Home() {
                         </div>
 
                         <Link
-                            href="/shop"
+                            href={product_list()}
                             className="text-sm font-semibold text-indigo-600 hover:text-indigo-700"
                         >
                             View all products →
@@ -149,7 +152,7 @@ export default function Home() {
                         </div>
 
                         <Link
-                            href="/categories"
+                            href={categories()}
                             className="text-sm font-semibold text-indigo-600 hover:text-indigo-700"
                         >
                             View all categories →

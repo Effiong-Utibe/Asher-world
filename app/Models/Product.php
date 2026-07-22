@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enum\ProductStatusEnum;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -18,7 +19,6 @@ class Product extends Model implements HasMedia
         'department_id',
         'name',
         'slug',
-        'sku',
         'short_description',
         'description',
         'material',
@@ -27,6 +27,9 @@ class Product extends Model implements HasMedia
         'final_price',
         'stock_quantity',
         'discount_percent',
+        'status',
+        'created_by',
+        'updated_by'
     ];
 
     protected $casts = [
@@ -34,7 +37,9 @@ class Product extends Model implements HasMedia
         'final_price' => 'decimal:2',
         'discount_percent' => 'decimal:2',
         'stock_quantity' => 'integer',
-    ];
+        'status' => ProductStatusEnum::class,
+];
+
 
     public function category(): BelongsTo
     {
@@ -45,14 +50,20 @@ class Product extends Model implements HasMedia
     {
         return $this->belongsTo(Department::class);
     }
-
     public function variants(): HasMany
     {
         return $this->hasMany(ProductVariant::class);
     }
-
     public function flag(): HasOne
     {
         return $this->hasOne(ProductFlag::class);
     }
+    public function tags(): HasMany
+    {
+        return $this->hasMany(ProductTag::class);
+    }
+    public function cartItems()
+{
+    return $this->hasMany(CartItem::class);
+}
 }

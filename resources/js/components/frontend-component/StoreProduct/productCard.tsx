@@ -1,8 +1,8 @@
-import React from 'react';
 import { Heart, ShoppingCart, Eye } from 'lucide-react';
-import type { Product } from './types';
-import StarRating from './starRating';
+import React from 'react';
 import { Button } from '@/components/ui/button';
+import StarRating from './starRating';
+import type { Product } from './types';
 
 type ProductCardProps = {
     product: Product;

@@ -2,7 +2,10 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Cart;
+use App\Models\Category;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -33,15 +36,91 @@ class HandleInertiaRequests extends Middleware
      *
      * @return array<string, mixed>
      */
-    public function share(Request $request): array
-    {
-        return [
-            ...parent::share($request),
-            'name' => config('app.name'),
-            'auth' => [
-                'user' => $request->user(),
-            ],
-            'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
-        ];
-    }
+//     public function share(Request $request): array
+//     {
+//         return [
+//             ...parent::share($request),
+//             'name' => config('app.name'),
+//            'auth' => [
+//                 'user' => auth()->user()
+//                     ? [
+//                         'id' => auth()->id(),
+//                         'name' => auth()->user()->name,
+//                         'email' => auth()->user()->email,
+//                         'role' => auth()->user()->role,
+//                         'is_admin' => auth()->user()->is_admin,
+//                     ]
+//                     : null,
+// ],
+//             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+//              'flash' => [
+//                 'message' => fn () => $request->session()->get('message')
+//             ],
+//                  'categories' => fn () => Category::select('id','name','slug')->get(),
+
+//         // 'cartCount' => fn () =>
+//         //     Auth::check()
+//         //         ? Cart::where('user_id', Auth::id())->sum('quantity')
+//         //         : 0,
+//         'cartCount' => fn () => Auth::check()
+//     ? (Cart::where('user_id', Auth::id())
+//         ->first()?->items()
+//         ->sum('quantity') ?? 0)
+//     : 0,
+
+//         'wishlistCount' => fn () => 0,
+
+//         'settings' => [
+//             'site_name' => config('app.name'),
+//             'logo' => asset('images/logo.png'),
+//         ],
+//         ];
+//     }
+public function share(Request $request): array
+{
+    return [
+        ...parent::share($request),
+
+        'name' => config('app.name'),
+'auth' => [
+    'user' => Auth::check()
+        ? [
+            'id' => Auth::id(),
+            'name' => Auth::user()->name,
+            'email' => Auth::user()->email,
+         'role' => Auth::user()->getRoleNames()->first(),
+            'is_admin' => Auth::user()->hasRole('Admin'),
+        ]
+        : null,
+],
+        'sidebarOpen' => ! $request->hasCookie('sidebar_state')
+        || $request->cookie('sidebar_state') === 'true',
+
+        'flash' => [
+            'message' => fn () => $request->session()->get('message'),
+        ],
+
+        'categories' => fn () =>
+            Category::select('id', 'name', 'slug')->get(),
+
+     'cartCount' => fn () => Auth::check()
+    ? Cart::firstWhere('user_id', Auth::id())
+        ?->items()
+        ->sum('quantity') ?? 0
+    : 0,
+
+        // Replace with your actual Wishlist model when implemented.
+        'wishlistCount' => fn () => 0,
+    //     'wishlistCount' => fn () =>
+    // Auth::check()
+    //     ? Wishlist::where('user_id', Auth::id())->count()
+    //     : 0,
+
+        'settings' => [
+            'site_name' => config('app.name'),
+            'logo' => asset('images/logo.png'),
+        ],
+    ];
+}
+
 }
